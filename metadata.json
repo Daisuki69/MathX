@@ -1,0 +1,8 @@
+{
+  "name": "Sage Formula Lab",
+  "description": "Offline SageMath formula validation, randomization, and scientific calculator keyboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
