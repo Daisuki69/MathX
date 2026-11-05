@@ -6,6 +6,7 @@ import android.content.Context
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
@@ -109,6 +110,10 @@ fun FormulaLabScreen(
     val scrollState = rememberScrollState()
     val outsideInteractionSource = remember { MutableInteractionSource() }
 
+    BackHandler(enabled = uiState.isKeyboardVisible) {
+        viewModel.setKeyboardVisible(false)
+    }
+
     Scaffold(
         modifier = modifier
             .fillMaxSize()
@@ -200,6 +205,16 @@ fun FormulaLabScreen(
                                 onOutsideClick = { viewModel.setKeyboardVisible(false) }
                             )
 
+                            AnswerBox(
+                                answer = uiState.answer,
+                                onCopy = { text ->
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("Answer", text))
+                                    Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+                                },
+                                onOutsideClick = { viewModel.setKeyboardVisible(false) }
+                            )
+
                             Spacer(modifier = Modifier.height(16.dp))
                         }
                     }
@@ -211,7 +226,7 @@ fun FormulaLabScreen(
                     selectedTab = uiState.selectedTab,
                     onTabSelected = viewModel::onTabSelected,
                     onKeyClick = viewModel::onKeyClick,
-                    onKeyLongClick = viewModel::onKeyLongClick,
+                    onSelectAlternate = viewModel::onSelectAlternate,
                     onNextStep = viewModel::onNextStep,
                     onBackspace = viewModel::onBackspace,
                     onClear = viewModel::onClear,
@@ -324,6 +339,7 @@ fun FormulaBox(
                         indication = null
                     ) {
                         onFocusBox()
+                        onSlotClick(value.text.length)
                     }
                     .padding(12.dp),
                 contentAlignment = Alignment.CenterStart
@@ -479,3 +495,95 @@ fun OutputBox(
         }
     }
 }
+
+@Composable
+fun AnswerBox(
+    answer: String?,
+    onCopy: (String) -> Unit,
+    onOutsideClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                onOutsideClick()
+            }
+            .testTag("answer_card_box"),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+        border = BorderStroke(1.dp, BorderDark)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "┌── Answer ─────────────────────┐",
+                    color = androidx.compose.ui.graphics.Color(0xFF10B981),
+                    fontFamily = JetBrainsMono,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                if (!answer.isNullOrEmpty()) {
+                    IconButton(
+                        onClick = { onCopy(answer) },
+                        modifier = Modifier
+                            .size(28.dp)
+                            .testTag("answer_btn_copy")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Copy answer",
+                            tint = androidx.compose.ui.graphics.Color(0xFF10B981),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(96.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(BgDark)
+                    .padding(12.dp)
+                    .testTag("answer_display"),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                if (!answer.isNullOrEmpty()) {
+                    val displayAnswer = com.example.ui.MathFormatter.toDisplayString(answer)
+                    com.example.ui.math.MathFormulaView(
+                        formula = displayAnswer,
+                        fontSize = 22.sp,
+                        color = androidx.compose.ui.graphics.Color(0xFF10B981)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = "└────────────────────────────┘",
+                color = androidx.compose.ui.graphics.Color(0xFF10B981),
+                fontFamily = JetBrainsMono,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+

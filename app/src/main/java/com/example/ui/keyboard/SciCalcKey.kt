@@ -24,5 +24,6 @@ data class SciCalcKey(
     val isSubscriptOrSuperscript: Boolean = false,
     val hasAlternate: Boolean = false,
     val altInsertText: String? = null,
-    val altCursorOffset: Int = 0
+    val altCursorOffset: Int = 0,
+    val alternates: List<SciCalcKey> = emptyList()
 )

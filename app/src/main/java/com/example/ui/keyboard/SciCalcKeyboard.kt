@@ -3,12 +3,12 @@ package com.example.ui.keyboard
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,10 +28,12 @@ import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,21 +44,31 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import com.example.ui.theme.JetBrainsMono
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun SciCalcKeyboard(
     selectedTab: KeyboardTab,
     onTabSelected: (KeyboardTab) -> Unit,
     onKeyClick: (SciCalcKey) -> Unit,
-    onKeyLongClick: (SciCalcKey) -> Unit = {},
+    onSelectAlternate: (SciCalcKey, SciCalcKey) -> Unit = { _, alt -> onKeyClick(alt) },
     onBackspace: () -> Unit,
     onClear: () -> Unit,
     onCursorLeft: () -> Unit,
@@ -132,19 +144,10 @@ fun SciCalcKeyboard(
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF1A202E))
-                        .border(BorderStroke(1.dp, Color(0xFF29334A)), RoundedCornerShape(8.dp))
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onCursorLeft()
-                        }
-                        .testTag("keyboard_btn_cursor_left"),
-                    contentAlignment = Alignment.Center
+                RepeatActionButton(
+                    onAction = onCursorLeft,
+                    modifier = Modifier.weight(1f),
+                    testTag = "keyboard_btn_cursor_left"
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -154,19 +157,10 @@ fun SciCalcKeyboard(
                     )
                 }
 
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF1A202E))
-                        .border(BorderStroke(1.dp, Color(0xFF29334A)), RoundedCornerShape(8.dp))
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onCursorRight()
-                        }
-                        .testTag("keyboard_btn_cursor_right"),
-                    contentAlignment = Alignment.Center
+                RepeatActionButton(
+                    onAction = onCursorRight,
+                    modifier = Modifier.weight(1f),
+                    testTag = "keyboard_btn_cursor_right"
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
@@ -176,19 +170,12 @@ fun SciCalcKeyboard(
                     )
                 }
 
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF1E2638))
-                        .border(BorderStroke(1.dp, Color(0xFF2E3B56)), RoundedCornerShape(8.dp))
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onNextStep()
-                        }
-                        .testTag("keyboard_btn_next_step"),
-                    contentAlignment = Alignment.Center
+                TouchDownButton(
+                    onAction = onNextStep,
+                    modifier = Modifier.weight(1f),
+                    testTag = "keyboard_btn_next_step",
+                    backgroundColor = Color(0xFF1E2638),
+                    borderColor = Color(0xFF2E3B56)
                 ) {
                     Text(
                         text = "⇥",
@@ -199,19 +186,12 @@ fun SciCalcKeyboard(
                     )
                 }
 
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF172030))
-                        .border(BorderStroke(1.dp, Color(0xFF24324D)), RoundedCornerShape(8.dp))
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onKeyClick(SciCalcKey("(", "(", 0, KeyCategory.OPERATOR))
-                        }
-                        .testTag("keyboard_btn_paren_open"),
-                    contentAlignment = Alignment.Center
+                TouchDownButton(
+                    onAction = { onKeyClick(SciCalcKey("(", "(", 0, KeyCategory.OPERATOR)) },
+                    modifier = Modifier.weight(1f),
+                    testTag = "keyboard_btn_paren_open",
+                    backgroundColor = Color(0xFF172030),
+                    borderColor = Color(0xFF24324D)
                 ) {
                     Text(
                         text = "(",
@@ -222,19 +202,12 @@ fun SciCalcKeyboard(
                     )
                 }
 
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF172030))
-                        .border(BorderStroke(1.dp, Color(0xFF24324D)), RoundedCornerShape(8.dp))
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onKeyClick(SciCalcKey(")", ")", 0, KeyCategory.OPERATOR))
-                        }
-                        .testTag("keyboard_btn_paren_close"),
-                    contentAlignment = Alignment.Center
+                TouchDownButton(
+                    onAction = { onKeyClick(SciCalcKey(")", ")", 0, KeyCategory.OPERATOR)) },
+                    modifier = Modifier.weight(1f),
+                    testTag = "keyboard_btn_paren_close",
+                    backgroundColor = Color(0xFF172030),
+                    borderColor = Color(0xFF24324D)
                 ) {
                     Text(
                         text = ")",
@@ -245,19 +218,12 @@ fun SciCalcKeyboard(
                     )
                 }
 
-                Box(
-                    modifier = Modifier
-                        .weight(1.1f)
-                        .height(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF2C1620))
-                        .border(BorderStroke(1.dp, Color(0xFF4E2032)), RoundedCornerShape(8.dp))
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onClear()
-                        }
-                        .testTag("keyboard_btn_clear"),
-                    contentAlignment = Alignment.Center
+                TouchDownButton(
+                    onAction = onClear,
+                    modifier = Modifier.weight(1.1f),
+                    testTag = "keyboard_btn_clear",
+                    backgroundColor = Color(0xFF2C1620),
+                    borderColor = Color(0xFF4E2032)
                 ) {
                     Text(
                         text = "AC",
@@ -268,19 +234,12 @@ fun SciCalcKeyboard(
                     )
                 }
 
-                Box(
-                    modifier = Modifier
-                        .weight(1.1f)
-                        .height(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF282015))
-                        .border(BorderStroke(1.dp, Color(0xFF47361C)), RoundedCornerShape(8.dp))
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onBackspace()
-                        }
-                        .testTag("keyboard_btn_backspace"),
-                    contentAlignment = Alignment.Center
+                RepeatActionButton(
+                    onAction = onBackspace,
+                    modifier = Modifier.weight(1.1f),
+                    testTag = "keyboard_btn_backspace",
+                    backgroundColor = Color(0xFF282015),
+                    borderColor = Color(0xFF47361C)
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Backspace,
@@ -310,12 +269,301 @@ fun SciCalcKeyboard(
                         rowKeys.forEach { key ->
                             KeyButton(
                                 key = key,
-                                onClick = { onKeyClick(key) },
-                                onLongClick = { onKeyLongClick(key) },
+                                onAction = { onKeyClick(key) },
+                                onSelectAlternate = { altKey ->
+                                    onSelectAlternate(key, altKey)
+                                },
                                 modifier = Modifier.weight(1f)
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TouchDownButton(
+    onAction: () -> Unit,
+    modifier: Modifier = Modifier,
+    testTag: String,
+    backgroundColor: Color = Color(0xFF1A202E),
+    borderColor: Color = Color(0xFF29334A),
+    content: @Composable () -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    var isPressed by remember { mutableStateOf(false) }
+
+    val bg = if (isPressed) backgroundColor.copy(alpha = 0.6f) else backgroundColor
+
+    Box(
+        modifier = modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(bg)
+            .border(BorderStroke(1.dp, borderColor), RoundedCornerShape(8.dp))
+            .pointerInput(onAction) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    down.consume()
+                    isPressed = true
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onAction()
+                    waitForUpOrCancellation()
+                    isPressed = false
+                }
+            }
+            .testTag(testTag),
+        contentAlignment = Alignment.Center
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun RepeatActionButton(
+    onAction: () -> Unit,
+    modifier: Modifier = Modifier,
+    testTag: String,
+    backgroundColor: Color = Color(0xFF1A202E),
+    borderColor: Color = Color(0xFF29334A),
+    content: @Composable () -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    var isPressed by remember { mutableStateOf(false) }
+
+    val bg = if (isPressed) backgroundColor.copy(alpha = 0.6f) else backgroundColor
+
+    Box(
+        modifier = modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(bg)
+            .border(BorderStroke(1.dp, borderColor), RoundedCornerShape(8.dp))
+            .pointerInput(onAction) {
+                coroutineScope {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        down.consume()
+                        isPressed = true
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onAction()
+
+                        val repeatJob = launch {
+                            delay(380L)
+                            while (down.pressed) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onAction()
+                                delay(45L)
+                            }
+                        }
+
+                        waitForUpOrCancellation()
+                        repeatJob.cancel()
+                        isPressed = false
+                    }
+                }
+            }
+            .testTag(testTag),
+        contentAlignment = Alignment.Center
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun KeyButton(
+    key: SciCalcKey,
+    onAction: () -> Unit,
+    onSelectAlternate: (SciCalcKey) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+    var isPressed by remember { mutableStateOf(false) }
+    var isPopupOpen by remember { mutableStateOf(false) }
+    var hoveredIndex by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+
+    val (keyBg, borderColor, textColor) = when (key.category) {
+        KeyCategory.NUMBER -> Triple(Color(0xFF202738), Color(0xFF303B52), Color(0xFFF8FAFC))
+        KeyCategory.OPERATOR -> Triple(Color(0xFF172030), Color(0xFF26334D), Color(0xFF38BDF8))
+        KeyCategory.VARIABLE -> Triple(Color(0xFF192338), Color(0xFF2A3A5E), Color(0xFF818CF8))
+        KeyCategory.FUNCTION -> Triple(Color(0xFF181E2E), Color(0xFF27324B), Color(0xFFC084FC))
+        KeyCategory.ACTION -> Triple(Color(0xFFE11D48), Color(0xFFFB7185), Color(0xFFFFFFFF))
+    }
+
+    val displayBg = if (isPressed) keyBg.copy(alpha = 0.5f) else keyBg
+    val isItalic = key.category == KeyCategory.VARIABLE && key.label.length == 1 && (key.label[0].isLetter() || key.label[0] in "αβγδεθλμπρστφωΔ")
+
+    Box(
+        modifier = modifier
+            .height(48.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(displayBg)
+            .border(BorderStroke(1.dp, borderColor), RoundedCornerShape(10.dp))
+            .pointerInput(key) {
+                coroutineScope {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        down.consume()
+                        isPressed = true
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+
+                        onAction()
+
+                        if (key.alternates.isNotEmpty()) {
+                            val pointerId = down.id
+                            var popupActive = false
+
+                            val holdJob = launch {
+                                delay(250L)
+                                popupActive = true
+                                isPopupOpen = true
+                                hoveredIndex = 0
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+
+                            val itemWidthPx = with(density) { 44.dp.toPx() }
+                            val maxDeltaY = with(density) { 90.dp.toPx() }
+
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.find { it.id == pointerId } ?: break
+
+                                if (popupActive) {
+                                    val deltaX = change.position.x - down.position.x
+                                    val deltaY = change.position.y - down.position.y
+
+                                    val calculatedIdx = (deltaX / itemWidthPx).toInt().coerceIn(0, key.alternates.lastIndex)
+                                    if (calculatedIdx != hoveredIndex) {
+                                        hoveredIndex = calculatedIdx
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    }
+
+                                    if (change.changedToUp()) {
+                                        change.consume()
+                                        holdJob.cancel()
+                                        isPopupOpen = false
+                                        isPressed = false
+                                        if (deltaY > -maxDeltaY * 2 && deltaY < maxDeltaY) {
+                                            onSelectAlternate(key.alternates[hoveredIndex])
+                                        }
+                                        break
+                                    }
+                                } else {
+                                    if (change.changedToUp()) {
+                                        change.consume()
+                                        holdJob.cancel()
+                                        isPressed = false
+                                        break
+                                    }
+                                }
+                            }
+                        } else {
+                            waitForUpOrCancellation()
+                            isPressed = false
+                        }
+                    }
+                }
+            }
+            .testTag("keyboard_key_${key.label}"),
+        contentAlignment = Alignment.Center
+    ) {
+        when (key.label) {
+            "a/b" -> FractionKeyIcon(color = textColor)
+            "√x", "√" -> SquareRootKeyIcon(color = textColor)
+            "xⁿ" -> PowerEmptyKeyIcon(color = textColor)
+            "x²" -> PowerSquaredKeyIcon(color = textColor)
+            "|x|" -> AbsValKeyIcon(color = textColor)
+            "d/dx" -> DerivativeKeyIcon(color = textColor)
+            "lim" -> LimitKeyIcon(color = textColor)
+            else -> {
+                Text(
+                    text = key.label,
+                    color = textColor,
+                    fontSize = when {
+                        key.category == KeyCategory.ACTION -> 22.sp
+                        key.category == KeyCategory.NUMBER -> 20.sp
+                        key.label.length >= 4 -> 12.sp
+                        key.label.length == 3 -> 13.sp
+                        else -> 17.sp
+                    },
+                    fontWeight = when (key.category) {
+                        KeyCategory.ACTION -> FontWeight.Bold
+                        KeyCategory.NUMBER -> FontWeight.SemiBold
+                        else -> FontWeight.SemiBold
+                    },
+                    fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                    fontFamily = if (isItalic) FontFamily.Serif else JetBrainsMono,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+
+        if (key.hasAlternate || key.alternates.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 4.dp, bottom = 4.dp)
+                    .size(3.dp)
+                    .background(Color(0xFF64748B), CircleShape)
+            )
+        }
+
+        if (isPopupOpen && key.alternates.isNotEmpty()) {
+            val offsetYPx = with(density) { (-54).dp.roundToPx() }
+
+            Popup(
+                alignment = Alignment.TopCenter,
+                offset = IntOffset(0, offsetYPx),
+                properties = PopupProperties(focusable = false)
+            ) {
+                KeyPopupSelector(
+                    alternates = key.alternates,
+                    hoveredIndex = hoveredIndex
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun KeyPopupSelector(
+    alternates: List<SciCalcKey>,
+    hoveredIndex: Int
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = Color(0xFF1E2638),
+        border = BorderStroke(1.5.dp, Color(0xFF38BDF8)),
+        shadowElevation = 14.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            alternates.forEachIndexed { idx, alt ->
+                val isHovered = idx == hoveredIndex
+                val bg = if (isHovered) Color(0xFF0284C7) else Color(0xFF28344E)
+                val border = if (isHovered) BorderStroke(1.5.dp, Color.White) else BorderStroke(1.dp, Color(0xFF334155))
+
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(bg)
+                        .border(border, RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = alt.label,
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = JetBrainsMono
+                    )
                 }
             }
         }
@@ -406,19 +654,16 @@ private fun PowerEmptyKeyIcon(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = "x",
-            color = color,
-            fontSize = 17.sp,
-            fontFamily = JetBrainsMono,
-            fontStyle = FontStyle.Italic,
-            fontWeight = FontWeight.SemiBold
+        Box(
+            modifier = Modifier
+                .size(13.dp)
+                .border(BorderStroke(1.5.dp, color), RoundedCornerShape(2.5.dp))
         )
         Spacer(modifier = Modifier.width(2.dp))
         Box(
             modifier = Modifier
-                .padding(bottom = 8.dp)
-                .size(11.dp)
+                .padding(bottom = 10.dp)
+                .size(9.dp)
                 .border(BorderStroke(1.5.dp, color), RoundedCornerShape(2.dp))
         )
     }
@@ -438,7 +683,7 @@ private fun PowerSquaredKeyIcon(
             text = "x",
             color = color,
             fontSize = 17.sp,
-            fontFamily = JetBrainsMono,
+            fontFamily = FontFamily.Serif,
             fontStyle = FontStyle.Italic,
             fontWeight = FontWeight.SemiBold
         )
@@ -513,7 +758,7 @@ private fun DerivativeKeyIcon(
             text = "dx",
             color = color,
             fontSize = 10.sp,
-            fontFamily = JetBrainsMono,
+            fontFamily = FontFamily.Serif,
             fontStyle = FontStyle.Italic,
             fontWeight = FontWeight.Bold,
             lineHeight = 10.sp
@@ -546,113 +791,5 @@ private fun LimitKeyIcon(
             fontFamily = JetBrainsMono,
             lineHeight = 8.sp
         )
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun KeyButton(
-    key: SciCalcKey,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val haptic = LocalHapticFeedback.current
-
-    val (keyBg, borderColor, textColor) = when (key.category) {
-        KeyCategory.NUMBER -> Triple(
-            Color(0xFF202738),
-            Color(0xFF303B52),
-            Color(0xFFF8FAFC)
-        )
-        KeyCategory.OPERATOR -> Triple(
-            Color(0xFF172030),
-            Color(0xFF26334D),
-            Color(0xFF38BDF8)
-        )
-        KeyCategory.VARIABLE -> Triple(
-            Color(0xFF192338),
-            Color(0xFF2A3A5E),
-            Color(0xFF818CF8)
-        )
-        KeyCategory.FUNCTION -> Triple(
-            Color(0xFF181E2E),
-            Color(0xFF27324B),
-            Color(0xFFC084FC)
-        )
-        KeyCategory.ACTION -> Triple(
-            Color(0xFFE11D48),
-            Color(0xFFFB7185),
-            Color(0xFFFFFFFF)
-        )
-    }
-
-    val isItalic = key.category == KeyCategory.VARIABLE && key.label.length == 1 && key.label[0].isLetter()
-
-    val interactionSource = remember { MutableInteractionSource() }
-
-    Box(
-        modifier = modifier
-            .height(48.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(keyBg)
-            .border(BorderStroke(1.dp, borderColor), RoundedCornerShape(10.dp))
-            .combinedClickable(
-                interactionSource = interactionSource,
-                indication = ripple(color = textColor),
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onClick()
-                },
-                onLongClick = {
-                    if (key.hasAlternate) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onLongClick()
-                    }
-                }
-            )
-            .testTag("keyboard_key_${key.label}"),
-        contentAlignment = Alignment.Center
-    ) {
-        when (key.label) {
-            "a/b" -> FractionKeyIcon(color = textColor)
-            "√x" -> SquareRootKeyIcon(color = textColor)
-            "xⁿ" -> PowerEmptyKeyIcon(color = textColor)
-            "x²" -> PowerSquaredKeyIcon(color = textColor)
-            "|x|" -> AbsValKeyIcon(color = textColor)
-            "d/dx" -> DerivativeKeyIcon(color = textColor)
-            "lim" -> LimitKeyIcon(color = textColor)
-            else -> {
-                Text(
-                    text = key.label,
-                    color = textColor,
-                    fontSize = when {
-                        key.category == KeyCategory.ACTION -> 22.sp
-                        key.category == KeyCategory.NUMBER -> 20.sp
-                        key.label.length >= 4 -> 12.sp
-                        key.label.length == 3 -> 13.sp
-                        else -> 17.sp
-                    },
-                    fontWeight = when (key.category) {
-                        KeyCategory.ACTION -> FontWeight.Bold
-                        KeyCategory.NUMBER -> FontWeight.SemiBold
-                        else -> FontWeight.SemiBold
-                    },
-                    fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
-                    fontFamily = JetBrainsMono,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-
-        if (key.hasAlternate) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 4.dp, bottom = 4.dp)
-                    .size(3.dp)
-                    .background(Color(0xFF64748B), CircleShape)
-            )
-        }
     }
 }

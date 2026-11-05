@@ -64,4 +64,43 @@ class ExampleUnitTest {
         assertFalse(mutation.mutatedFormula.isBlank())
         assertTrue(mutation.records.isNotEmpty())
     }
+
+    @Test
+    fun testMutateAddsEquationWhenVariablesPresent() {
+        val validation = engine.validate("3*x + 5")
+        assertTrue(validation.isValid)
+        val mutation = engine.mutate(validation)
+        assertTrue(mutation.mutatedFormula.contains("=="))
+        val ans = engine.evaluateAnswer(mutation.mutatedFormula, mutation.variableValues)
+        assertTrue(ans.contains("="))
+    }
+
+    @Test
+    fun testMutateAddsVariableEquationWhenAllValuesPresent() {
+        val validation = engine.validate("2 + 3 * 4")
+        assertTrue(validation.isValid)
+        val mutation = engine.mutate(validation)
+        assertTrue(mutation.mutatedFormula.contains("=="))
+        val ans = engine.evaluateAnswer(mutation.mutatedFormula, mutation.variableValues)
+        assertTrue(ans.contains("="))
+    }
+
+    @Test
+    fun testMutateDenominatorIsNeverEmpty() {
+        for (i in 0 until 10) {
+            val validation = engine.validate("x / 2 + 3 / 4")
+            assertTrue(validation.isValid)
+            val mutation = engine.mutate(validation)
+            assertFalse(mutation.mutatedFormula.contains("/()"))
+            assertFalse(mutation.mutatedFormula.contains("/( )"))
+            assertFalse(Regex("""/\s*(?=[+=\-<>]|$)""").containsMatchIn(mutation.mutatedFormula))
+            assertFalse(mutation.mutatedFormula.endsWith("/"))
+        }
+    }
+
+    @Test
+    fun testEvaluateAnswerHandlesVariableOnBothSides() {
+        val ans = engine.evaluateAnswer("4*x - 3 == 2*x + 3")
+        assertEquals("x = 3", ans)
+    }
 }

@@ -1,6 +1,24 @@
 package com.example.ui
 
 object MathFormatter {
+    private val greekToAscii = listOf(
+        "α" to "alpha",
+        "β" to "beta",
+        "γ" to "gamma",
+        "δ" to "delta",
+        "ε" to "epsilon",
+        "θ" to "theta",
+        "λ" to "lambda",
+        "μ" to "mu",
+        "π" to "pi",
+        "ρ" to "rho",
+        "σ" to "sigma",
+        "τ" to "tau",
+        "φ" to "phi",
+        "ω" to "omega",
+        "Δ" to "Delta"
+    )
+
     fun toDisplayString(rawFormula: String): String {
         var result = rawFormula
             .replace("==", " = ")
@@ -23,13 +41,17 @@ object MathFormatter {
             .replace("^x", "ˣ")
             .replace("^y", "ʸ")
             .replace("oo", "∞")
-            .replace("pi", "π")
             .replace("arcsin", "sin⁻¹")
             .replace("arccos", "cos⁻¹")
             .replace("arctan", "tan⁻¹")
 
+        for ((unicode, ascii) in greekToAscii) {
+            result = result.replace(Regex("""\b$ascii\b"""), unicode)
+        }
+
         result = result.replace(Regex("""sqrt\(([^)]+)\)"""), "√($1)")
         result = result.replace(Regex("""abs\(([^)]+)\)"""), "|$1|")
+        result = result.replace(Regex("""\s*/\s*"""), "/")
         result = result.replace(Regex("""\s+"""), " ").trim()
         return result
     }
@@ -57,10 +79,13 @@ object MathFormatter {
             .replace("ˣ", "^x")
             .replace("ʸ", "^y")
             .replace("∞", "oo")
-            .replace("π", "pi")
             .replace("sin⁻¹", "arcsin")
             .replace("cos⁻¹", "arccos")
             .replace("tan⁻¹", "arctan")
+
+        for ((unicode, ascii) in greekToAscii) {
+            result = result.replace(unicode, ascii)
+        }
 
         result = result.replace(Regex("""√\(([^)]*)\)"""), "sqrt($1)")
         result = result.replace(Regex("""√([a-zA-Z0-9]+)"""), "sqrt($1)")

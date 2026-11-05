@@ -1,126 +1,126 @@
-# SageMath Formula Lab & Scientific Keyboard
+# Photomath Parity: 2D Structural Math Engine & Keypad Refactoring
 
-An offline SageMath-compatible formula validation, token mutation, and interactive scientific calculator environment for Android built with Jetpack Compose.
+Comprehensive architectural plan to eliminate all range parser anomalies, out-of-order typing race conditions, baseline misalignment, and dead cursor zones, while introducing continuous press-drag-release popup navigation and native single-character Unicode mathematical Greek typesetting.
+
+## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> **Confirmed Architecture & UX Decisions from Phase 1:**
-> - **Validation & Execution Strategy**: Fully offline SageMath-compatible symbolic lexer, recursive descent parser, and AST validator with exact SageMath grammar (implicit multiplication, power operators `^` / `**`, Python/Sage mathematical functions, symbolic variables, constants, and calculus notations).
-> - **Formula Randomization Behavior**: Identifies detected symbolic variables, constants, and operators in the input formula; mutates constants and variables into valid alternative expressions while preserving mathematical syntactic integrity; displays token breakdowns alongside mutated expressions in the Output box.
-> - **Scientific Keyboard Layout**: Custom embedded tabbed keyboard featuring dedicated tabs for **Algebra**, **Calculus & Analysis**, and **Greek & Symbols**, with seamless text cursor insertion and tactile haptic feedback.
+> The following core interaction and typesetting decisions have been confirmed and incorporated directly into this architectural blueprint:
+
+- **Confirmed Decision 1: Continuous Press-Drag-Release Alternate Popups**:
+  - The alternate key popup uses `PopupProperties(focusable = false)` so the touch pointer stream is never hijacked or interrupted.
+  - When a key is held for ~250ms, the popup opens with the first alternate option highlighted by default.
+  - The user can slide their finger horizontally across alternate options (`(deltaX / itemWidthPx).toInt().coerceIn(0, alternates.lastIndex)`) and release directly onto the desired keycap to commit the action, or slide vertically off-target to cancel cleanly.
+- **Confirmed Decision 2: Single-Character Unicode Greek Typesetting**:
+  - Keyboard layouts and formula state store single-character Unicode glyphs (`α`, `β`, `γ`, `θ`, `π`, `Δ`) instead of multi-character English spellings (`"alpha"`, `"theta"`).
+  - Deletion, cursor navigation, and parsing become atomic 1-character operations without dead cursor zones or freeze glitches.
+  - Translation to ASCII names for Symja computation occurs strictly at the engine boundary in `MathFormatter.toParseableString()` and is converted back via `MathFormatter.toDisplayString()`.
 
 ---
 
-### 1. Overview & Core Concept
+## 1. Overview & Core Concept
 
-- **What It Does**: Provides a dedicated mathematical laboratory featuring an interactive Formula input box. Tapping the formula box reveals a built-in scientific calculator keyboard with specialized tabs (Algebra, Calculus, Greek symbols, and Standard keypad). The engine parses and validates SageMath mathematical syntax offline, extracts all variables (e.g. $x, y, \theta$), numerical constants, and operators, and provides a one-tap randomizer that mutates these tokens into mathematically valid variant expressions displayed in a rich Output card.
-- **Target Audience / Persona**: Students, mathematicians, educators, researchers, and competitive exam creators who need to quickly enter complex formulas, verify syntax compatibility with SageMath, and generate mutated variant problems and test cases.
-- **Key Value**: Instant offline validation without server latency, effortless input of complex mathematical symbols without switching system keyboards, and intelligent AST-based formula mutation.
-
----
-
-### 2. User Experience & Visual Design
-
-#### Key User Flows
-1. **Formula Input & Keyboard Activation**:
-   - The user views the clean mathematical workspace with the **Formula** container at the top and the **Output** container below.
-   - Tapping the Formula field activates cursor focus and slides up the custom **Scientific Keyboard** anchored at the bottom, suppressing intrusive system soft-keyboards while providing specialized math keys.
-   - Switching between tabs (**Algebra**, **Calculus**, **Greek**, **Numbers & Basic**) allows one-touch entry of symbols like $\int, \frac{d}{dx}, \sqrt{\cdot}, \pi, \infty, \sin, \cos, \theta, \lambda$.
-2. **Real-time SageMath Validation**:
-   - As expressions are entered, an inline badge indicates status: Valid Sage expression (Green with check), Syntax warning (Yellow), or Invalid (Red with exact error position and suggestion).
-3. **Randomization & Output Generation**:
-   - Tapping the **Randomize** action button triggers the AST mutation engine.
-   - The detected tokens (variables, constants, operators) are highlighted in interactive chips.
-   - The mutated formula is rendered in the Output box, complete with quick actions to Copy, Insert Back, or Inspect token mappings.
-
-#### Visual Identity & Theme
-- **Aesthetic Direction**: Modern High-Precision Engineering Lab — deep slate dark backdrop with electric indigo and cyan accents, clean border strokes, monospace mathematical typography, and high-contrast tactile keys.
-- **Color Palette & Tokens**:
-  - `Background`: Deep Midnight Slate (`#0B0F19`)
-  - `Surface / Container`: Elevated Dark Slate (`#151D2E`)
-  - `Surface Variant / Keycap`: Tactile Slate (`#1E293B`)
-  - `Keycap Active / Highlight`: Electric Indigo (`#6366F1`)
-  - `Primary Accent`: Bright Cyan (`#06B6D4`)
-  - `Success / Valid`: Emerald Green (`#10B981`)
-  - `Error / Invalid`: Crimson Coral (`#F43F5E`)
-  - `Text Primary`: Crisp White (`#F8FAFC`)
-  - `Text Secondary`: Muted Lavender (`#94A3B8`)
-- **Typography & Hierarchy**:
-  - Display Headers: JetBrains Mono / Space Grotesk styling for technical clarity.
-  - Formula Fields: Tabular monospace font with bold mathematical glyphs, subtle brackets coloring, and large legible text sizes ($20\text{sp}$ to $24\text{sp}$).
-  - Keycap Labels: Clean, legible centered mathematical symbols ($16\text{sp}$ to $20\text{sp}$).
-- **Interactive Feedback & Motion**:
-  - Smooth slide-in and slide-out keyboard animations with Compose `AnimatedVisibility`.
-  - Spring-based key press ripples and micro-bounce on keyboard taps.
-  - Haptic feedback tick on keypress.
-  - Smooth crossfade transitions in the Output box when displaying mutated formula variants.
+- **What It Does**: Upgrades the formula editing and keypad engine from a string-dependent parser to a true 2D Abstract Syntax Tree (AST) renderer with zero range drift, atomic cursor positioning, seamless structural template wrapping, aligned mathematical typography, and tactile two-thumb typing responsiveness.
+- **Target Audience**: Students, researchers, and engineers demanding instant, textbook-accurate equation composition on mobile.
+- **Key Value**: Delivers genuine Photomath-level fluid touch response, eliminating ghost parentheses, dead cursor gaps, out-of-order keystrokes, and text-baseline collisions.
 
 ---
 
-### 3. Key Product Decisions & Trade-Offs
+## 2. User Experience & Visual Design
 
-- **Decision 1: Offline SageMath AST Parser vs Heavy Python Binary**
-  - *Chosen Approach*: A zero-dependency, high-performance recursive descent mathematical lexer and AST parser implemented directly in Kotlin that matches SageMath's syntax specifications (supporting Sage variable declarations, implicit multiplications like `2x` $\to$ `2*x`, power operators `^` and `**`, standard CAS functions `sin, cos, exp, log, diff, integrate`, Greek variable identifiers, and rational fractions).
-  - *Why*: SageMath is a massive multi-gigabyte Python/C++ distribution that cannot run natively inside an Android client. An in-process Kotlin engine guarantees instant $0\text{ms}$ latency, zero network dependency, zero battery drain, and $100\%$ reliable offline behavior.
-  - *Alternatives Considered*: Bundling a Python runtime via Chaquopy or termux-chroot was rejected because it balloons APK size by $>150\text{MB}$, incurs multi-second startup delays, and causes severe device compatibility crashes.
-- **Decision 2: Token-Aware AST Mutation vs Naive String Replacement**
-  - *Chosen Approach*: Syntax-tree-aware mutation that traverses expressions, detects constants (integers, floats, standard named constants), variables, and binary operators, and substitutes them with mathematically compatible random alternatives while preserving expression arity and parenthesization.
-  - *Why*: Naive string regex replacement breaks syntax (e.g., replacing `x` inside `exp` would corrupt function names). AST mutation guarantees the mutated result remains a valid SageMath expression.
-- **Decision 3: In-App Embedded Soft Keyboard vs System IME Service**
-  - *Chosen Approach*: Built-in in-app Jetpack Compose tabbed scientific keyboard component integrated directly into the screen layout with custom text cursor state management.
-  - *Why*: An in-app keyboard does not require the user to navigate to Android System Settings to enable an input method or grant system-wide permissions. It works immediately out of the box with zero setup.
+- **Key User Flows**:
+  - **Fluid Two-Thumb Typing**: Every primary key triggers immediately on touch-down (`awaitFirstDown`), completely removing release latency and preventing race-condition keystroke reordering.
+  - **Press-Drag-Release Alternates**: Holding any multi-function key (e.g., `√x`, `x²`, `=`, `÷`, `sin`) opens a floating selector above the key; sliding the finger smoothly highlights options, and lifting inserts the selection immediately.
+  - **Pristine Structural Fractions & Exponents**:
+    - Pressing `a/b` inserts clean empty structural slots $\frac{\square}{\square}$ without space-character traps (`"( )/( )"`).
+    - Pressing `x²` or `xⁿ` on an empty slot renders pure visual placeholder boxes $\square^2$ and $\square^{\square}$ without ghost outer parentheses.
+  - **Seamless Structural Navigation**:
+    - Stepping with `←` and `→` moves fluidly across all visual boundaries with zero invisible dead zones.
+    - Tapping directly on the left or right half of any token places the cursor accurately before or after that specific glyph.
+    - Long formulas automatically scroll horizontally to keep the active cursor centered and visible.
+
+- **Visual Identity & Mathematical Typesetting**:
+  - **TeX-Grade Math Typography**:
+    - Variables ($x, y, z, \theta, \alpha, \beta$) typeset in serif italics (`FontFamily.Serif`, `FontStyle.Italic`).
+    - Operators ($+, -, \cdot, =$) rendered with standard 4.dp horizontal typographical breathing room.
+    - Exponents aligned to the true mathematical baseline of the base expression rather than floating or colliding.
+    - Square root vinculum extends dynamically from a fixed-geometry stem (`10.dp`) without diagonal slash distortion.
+  - **Color Palette & Atmosphere**:
+    - Keyboard background: deep slate `#0F131C` with border `#1E2433`.
+    - Active placeholder box: glowing cyan border `#38BDF8` with pulsing cursor bar.
+    - Variables: `#818CF8`; Operators: `#38BDF8`; Functions: `#C084FC`; Actions: `#E11D48`.
 
 ---
 
-### 4. Technical Architecture & Data Strategy
+## 3. Key Product Decisions & Trade-Offs
+
+- **Decision 1: Zero-Space Structural Representation (`""` vs `"( )"`)**:
+  - *Chosen Approach*: Structural slots without content will be represented as empty parentheses `""` or `"()"` internally without arbitrary space padding (`" "`).
+  - *Why*: Eliminates phantom space character traps that broke `numRange`, corrupted click hit-testing, and caused cursors to vanish.
+  - *Alternatives Considered*: Retaining space characters required fragile regex stripping and manual offset tracking that broke cursor stepping.
+
+- **Decision 2: Universal Touch-Down Dispatch with Gesture Continuation**:
+  - *Chosen Approach*: All primary keys invoke `onAction()` on pointer-down immediately. If a key has alternates, holding for 250ms enters drag-tracking mode without revoking the initial stroke unless an alternate is explicitly chosen.
+  - *Why*: Eliminates race-condition inversion where fast alternating two-thumb typing entered characters in reverse order.
+
+- **Decision 3: Bidirectional Coordinate Hit-Testing for Text Tokens**:
+  - *Chosen Approach*: Tapping a text glyph measures whether the touch fell on the left or right 50% of the token width, assigning cursor index to `node.start` or `node.end`.
+  - *Why*: Solves the defect where tapping the right side of a multi-digit number or variable jumped the cursor to the left.
+
+---
+
+## 4. Technical Architecture & Data Strategy
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                       UI Layer (M3)                         │
+│                       MainActivity                          │
 │  ┌───────────────────────┐       ┌───────────────────────┐  │
-│  │     Formula Box       │       │      Output Box       │  │
-│  │ (Rich Editable Field) │       │ (Result & Token View) │  │
-│  └───────────┬───────────┘       └───────────▲───────────┘  │
-│              │                               │              │
-│              ▼                               │              │
-│  ┌───────────────────────┐                   │              │
-│  │  Scientific Keyboard  │                   │              │
-│  │ [Alg] [Calc] [Greek]  │                   │              │
-│  └───────────┬───────────┘                   │              │
+│  │      FormulaBox       │       │       OutputBox       │  │
+│  │ (Auto-scroll & Tap)   │       │ (Symja Mutated View)  │  │
+│  └───────────▲───────────┘       └───────────▲───────────┘  │
 └──────────────┼───────────────────────────────┼──────────────┘
-               ▼                               │
-┌──────────────────────────────────────────────┴──────────────┐
-│                    ViewModel & State                        │
-│  - FormulaState (raw text, cursor selection)                │
-│  - ValidationResult (isValid, ast, tokens, errorDetails)    │
-│  - MutatedFormulaResult (outputFormula, substitutedTokens)  │
-│  - ActiveKeyboardTab (Algebra, Calculus, Greek, Basic)      │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 Offline Sage Engine & AST                   │
-│  ┌───────────────────┐               ┌───────────────────┐  │
-│  │ SageMath Lexer &  │──────────────>│ AST Validator &   │  │
-│  │ Tokenizer         │               │ Token Collector   │  │
-│  └───────────────────┘               └─────────┬─────────┘  │
-│                                                │            │
-│                                                ▼            │
-│                                      ┌───────────────────┐  │
-│                                      │ AST Formula       │  │
-│                                      │ Mutator Engine    │  │
-│                                      └───────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
+               │                               │
+               │ State Flow                    │
+┌──────────────▼───────────────────────────────▼──────────────┐
+│                      MainViewModel                          │
+│  - formulaInput: TextFieldValue (Unicode Display)           │
+│  - Smart Wrapping (Fraction / Exponent / Radical)           │
+│  - Structural Climbing Out & Function-Aware Backspace       │
+│  - Boundary Normalization (MathFormatter)                   │
+└──────────────▲───────────────────────────────▲──────────────┘
+               │                               │
+┌──────────────┴───────────────┐ ┌─────────────┴──────────────┐
+│      MathLayoutEngine        │ │      SciCalcKeyboard       │
+│  - AstParser (Pure AST)      │ │  - Instant Touch-Down      │
+│  - Range-Accurate Cursor     │ │  - Press-Drag-Release Pop  │
+│  - Baseline Math Alignment   │ │  - Scaled Mini-Templates   │
+│  - Dynamic Canvas Sqrt       │ │  - Repeat Action Engine    │
+└──────────────────────────────┘ └────────────────────────────┘
 ```
 
-#### Data Model & State
-- `FormulaToken`: Type (Variable, Constant, Operator, Function, Parenthesis), raw text, and position.
-- `ValidationState`: `Valid(ast: SageNode, tokens: List<FormulaToken>)`, `Invalid(message: String, errorIndex: Int)`, or `Empty`.
-- `MutationOption`: Configuration for mutation intensity (e.g. mutate constants, change variable names, swap complementary operators like `+`/`-` or `*`/`/`).
-- `KeyboardKey`: Key definition with primary label, insert string, display symbol, category, and cursor offset adjustment.
+### Component & File Mapping
 
-#### Interactive Component & State Mapping
-- **Formula Field Focus / Tap**: Updates `isKeyboardVisible = true`, positions cursor accurately, and highlights the active formula card with an animated indigo border.
-- **Key Tap**: Inserts characters/functions (e.g. `sin()`, `^`, `\theta`) at the exact cursor position, advancing the cursor inside parentheses automatically.
-- **Real-Time Parsing**: Debounced parsing via Kotlin StateFlow pipeline automatically emits token counts and validation status.
-- **Randomize Button**: Triggers `viewModel.randomizeFormula()`, executing the AST mutator and posting the updated variant to the Output box.
-- **Output Actions**: One-touch Copy to Clipboard, Use as Input, and Re-roll Mutation.
+1. **`app/src/main/java/com/example/ui/keyboard/KeyboardLayouts.kt`**:
+   - Replace English spellings in `greekRows` and `basicRows` with atomic Unicode characters (`α`, `β`, `γ`, `δ`, `ε`, `θ`, `λ`, `μ`, `π`, `ρ`, `σ`, `τ`, `φ`, `ω`, `Δ`).
+   - Remove redundant inverse trigonometric duplicates from `functionRows` and align Calculus tab keys.
+   - Attach alternate keys to all mathematical variants (`x³`, `x⁴`, `10ⁿ`, `eⁿ`, `∛`, `ⁿ√`).
+
+2. **`app/src/main/java/com/example/ui/keyboard/SciCalcKeyboard.kt`**:
+   - Refactor `KeyButton` to trigger `onAction()` on `awaitFirstDown` universally for zero release latency.
+   - Implement continuous pointer tracking: when held for 250ms, open non-focusable `Popup`, track horizontal drag offset across alternate options, highlight hovered keycap, and commit on pointer release.
+
+3. **`app/src/main/java/com/example/ui/math/MathLayoutEngine.kt`**:
+   - Eliminate phantom space tokenization in `AstParser` (`"()"` and `""` directly map to `EmptyPlaceholder`).
+   - Unwrap `ParenNode` in exponents and powers to prevent `([□])²` ghost parentheses.
+   - Fix cursor dead zones: map cursor positions across function headers (`sin`, `sqrt`, `cbrt`) and operator boundaries so the cursor never vanishes.
+   - Adjust `PowerNode` layout with baseline alignment so base characters align with preceding terms.
+   - Add operator horizontal padding (`3.dp`) and auto-scroll correlation in `MathFormulaView`.
+   - Implement width-fraction hit-testing in `RenderTextToken` (left half $\rightarrow$ start, right half $\rightarrow$ end).
+
+4. **`app/src/main/java/com/example/MainViewModel.kt`**:
+   - Adjust `handleFractionInput` to wrap without internal space characters.
+   - Extend smart wrapping across all alternate power and root functions (`x³`, `x⁴`, `10ⁿ`, `eⁿ`, `∛`, `ⁿ√`).
+   - Update `onBackspace` to handle clean removal of atomic Greek letters, factorial `!`, and space-free empty slots.
+
+5. **`app/src/main/java/com/example/ui/MathFormatter.kt`**:
+   - Map single-character Greek Unicode symbols to Symja ASCII identifiers in `toParseableString()` and restore them in `toDisplayString()`.
